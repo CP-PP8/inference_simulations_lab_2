@@ -25,10 +25,15 @@ set.seed(123) # good practice to set a random seed, or else different runs get y
 ## Import the libraries
 
 ```{r}
+# install.packages('apa')
+```
+
+```{r}
 # you can run install.packages('tidyverse')
 library(tidyverse)
 library(ggplot2) # plotting
 library(ggthemes) # good for making plots pretty
+library(apa)
 ```
 
 # Part 1: Simulating experimental data
@@ -64,6 +69,8 @@ make_tea_data <- function(n_total = 48,
 ```{r}
 # here's, we're calling our custom function, and specifying different inputs than the defaults (which are inside the parenthese up above)
 tea_data <- make_tea_data(n_total = 18, delta = .5)
+head(tea_data)
+summary(tea_data)
 ```
 
 Now, make a new data frame (call it tea_data_highn) with an N of 48, or something higher if you want. You need to call the custom function.
@@ -75,6 +82,21 @@ Call `summary(tea_data)` and look at the outputs. Call `head(tea_data)` to look 
 To do: Write basic tidyverse code to calculate the mean of each condition (hint: use `group_by` and `summarize`).
 
 ```{r}
+tea_data_highn <- make_tea_data(n_total = 48, delta = .5)
+```
+
+```{r}
+tea_data_highn %>%
+  group_by(condition)  %>%
+  summarize(
+    average_rating = mean(rating)
+  )
+  
+
+```
+
+```{r}
+head(tea_data_highn)
 
  
 ```
@@ -90,11 +112,17 @@ R practice: Use the `$` operator and then press `tab` to see how you can get spe
 Try writing the outputs of the t-test in a reproducible report style paragraph.
 
 ```{r}
-out_low_n <- tea_data %>%
-  t.test(rating ~ condition, data = .,  var.equal = TRUE)
+out_low_n <- t.test(rating ~ condition, data = tea_data,  var.equal = TRUE)
 
-out_high_n <- tea_data_highn %>%
-  t.test(rating ~ condition, data = ., var.equal = TRUE) 
+out_high_n <- t.test(rating ~ condition, data = tea_data_highn, var.equal = TRUE) 
+```
+
+```{r}
+t_apa(out_low_n)
+```
+
+```{r}
+t_apa(out_high_n)
 ```
 
 ### Simulate 1000 experiments
@@ -109,10 +137,16 @@ samps <- tibble(sim = 1:1000) |>
   unnest(cols = data) # wrangle
 ```
 
+```{r}
+head(samps)
+```
+
 OK, copy this but now change it so that you 48 participants per experiment
 
 ```{r}
-samps_highn <-...
+samps_highn <-tibble(sim = 1:1000) |> 
+  mutate(data = map(sim, \(i) make_tea_data(n_total = 48, delta = 1.5))) |>  # simulate
+  unnest(cols = data) # wrangle
 ```
 
 ### Summarize both of these simulations
@@ -126,12 +160,12 @@ To do: Comment what each line of code is doing to check your understanding, and 
 Bonus: Figure out a way to do this that is better than I what I did (some mix of base R and tidyverse, I'm sure there's a tidyverse only way)
 
 ```{r}
-tea_data_summary <- samps |>
+tea_data_summary <- samps |> 
   group_by(sim, condition) |> 
-  summarise(mean_rating = mean(rating)) |> 
+  summarise(mean_rating = mean(rating)) |> # get mean rating
   group_by(sim) |> 
   summarise(delta = mean_rating[condition == "milk first"] -
-              mean_rating[condition == "tea first"])
+              mean_rating[condition == "tea first"]) #calculate difference for each sim.
 ```
 
 ```{r}
@@ -139,8 +173,11 @@ tea_data_highn_summary <- samps_highn |>
   group_by(sim, condition) |> 
   summarise(mean_rating = mean(rating)) |> 
   group_by(sim) |> 
-  summarise(delta = mean_rating[condition == "milk first"] -
-              mean_rating[condition == "tea first"])
+  summarise(delta = mean_rating[condition == "milk first"] - mean_rating[condition == "tea first"])
+```
+
+```{r}
+head(tea_data_summary)
 ```
 
 ### Plot difference for low-n
@@ -148,15 +185,17 @@ tea_data_highn_summary <- samps_highn |>
 Let's make a plot to plot the differences in ratings across conditions for the low-n condition. You'll need to use ggplot or `hist`
 
 ```{r}
-
+hist(tea_data_summary$delta)
 ```
 
 ### Plot difference for higher-n
 
 To do: What's different about this distribution vs the one we just plotted?
 
-```{r}
+There is a difference in how narrow the distribution is. When we sample more data, the distribution becomes narrower as there is less sample noise
 
+```{r}
+hist(tea_data_highn_summary$delta)
 ```
 
 **Bonus** What happens if you run it again, but this time try changing the variance / mean of the effect when you change the `delta` and `sigma` values in the data simulation.
@@ -175,13 +214,22 @@ First, do the same thing as you did before - simulating 1000 experiments -- but 
 
 ```{r}
 # Simulate the null distribution
-  
+  samps_null <- tibble(sim = 1:1000) |> 
+  mutate(data = map(sim, \(i) make_tea_data(n_total = 18, delta = 0))) |>  # simulate
+  unnest(cols = data) # wrangle
 ```
 
 Visualize what this null distribution actually looks like.
 
 ```{r}
+null_data_summary <- samps_null |>
+  group_by(sim, condition) |> 
+  summarise(mean_rating = mean(rating)) |> 
+  group_by(sim) |> 
+  summarise(delta = mean_rating[condition == "milk first"] -
+              mean_rating[condition == "tea first"]) #calculate difference for each sim
 
+hist(null_data_summary$delta)
 ```
 
 ### Method 2: Shuffling
@@ -198,6 +246,8 @@ tea_data_highn_shuffled <- samps_highn %>%
 
 To do: check you understanding -- what is "sim" here?
 
+simulated data for each session but here we reshuffle data labels so it's going to be a null distribution when we plot a histogram across all sessions
+
 ```{r}
 tea_data_highn_shuffled_summary <- tea_data_highn_shuffled %>%
   group_by(condition_shuffled, sim) %>% 
@@ -212,6 +262,10 @@ tea_data_highn_shuffled_summary <- tea_data_highn_shuffled_summary %>%
 ```
 
 To do: what does this histogram look like and why?
+
+```{r}
+# look centered around 0. When we shuffle the label, we make an assumption that there is no difference between two conditions so the delta should be around 0. 
+```
 
 ```{R}
 hist(tea_data_highn_shuffled_summary$delta) #what does this histogram look like?
@@ -408,10 +462,10 @@ To do: Find the shortcut ggplot function so you don't have to calculate these by
 
 # Part 4: Simulating p-values across multiple experiments
 
-To do: Comment what the lines of code are doing 
-### When there is no actual effect
+To do: Comment what the lines of code are doing \### When there is no actual effect
 
-```{r}
+```{#| eval: false}
+{r}
 all_results=tibble() 
 
 for (this_sim in 1:1000) {
@@ -437,14 +491,16 @@ What is the distribution of p-values when the null is true?
 
 Calculate the proportion of p-values that are less than .05 What was our false positive rate?
 
-```{r}
+```{#| eval: false}
+{r}
 # you'll need all_results$pvalue
 hist(all_results$pvalue)
 ```
 
 ### Now for an experiment when there is actually an effect
 
-```{r}
+```{#| eval: false}
+{r}
 all_results_high_n=tibble() 
 
 for (this_sim in 1:500) {
